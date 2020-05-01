@@ -4,7 +4,6 @@
         ['$scope', '$timeout', 'WebAPI', '$rootScope', 'ngDialog', function ($scope, $timeout, WebAPI, $rootScope, ngDialog) {
 
 		$scope.viewScanDetails = function(scan) {
-            $scope.issues.initialLoadFinished = false;
 		    $scope.scanDetails.load(scan.application.id, scan.id);
 			$scope.currentScan = scan;
 			ngDialog.open({
@@ -32,32 +31,6 @@
                 }
             },
         };
-        
-        $scope.signinStatus = function () {
-            if (!$scope.scan.initialLoadFinished || !$scope.settings.initialLoadFinished) return;
-            
-            if ($scope.scan.ripsApps.length > 0) return;
-            
-            if ($scope.settings.username) return;
-            
-            document.fireEvent('toastWarning', {message: "Cannot find a valid connection to a RIPS server."});
-            
-            $scope.scan.signedIn = false;
-            $scope.scans.signedIn = false;
-            $scope.scanFromDocRoot.signedIn = false;
-        }
-        
-        $scope.$watch('scan.initialLoadFinished', function(newValue, oldValue) {
-            if ($scope.scan.initialLoadFinished == false) return;
-
-            $scope.signinStatus();
-        });
-        
-        $scope.$watch('settings.initialLoadFinished', function(newValue, oldValue) {
-            if ($scope.settings.initialLoadFinished == false) return;
-
-            $scope.signinStatus();
-        });
 
         $scope.scan = {
             zendApps: [],
@@ -65,8 +38,6 @@
             selectedRipsApp: '0',
             selectedZendApp: '0',
             version: new Date().toISOString(),
-            newAppName: '',
-            signedIn: true,
 
             // loading
             initialLoadFinished: false,
@@ -104,13 +75,7 @@
                     'rips_id': $scope.scan.selectedRipsApp,
                     'zend_path': $scope.scan.selectedZendApp,
                     'version': $scope.scan.version,
-                    'new_app_name': $scope.scan.newAppName,
                 };
-
-                if (data['rips_id'] === '0' && (!data['new_app_name'] || data['new_app_name'] === '')) {
-                    document.fireEvent('toastAlert', {message: 'Please enter an application name.'});
-                    return;
-                }
 
                 // default error message
                 var errorMessage = 'Error starting scan';
@@ -124,7 +89,7 @@
                     if (res && res.data && res.data.responseData  && res.data.responseData.success == '1') {
                         document.fireEvent('toastNotification', {message: 'Scan started'});
                         setTimeout(function() {
-                            $scope.scans.load(false);
+                            $scope.scans.load();
                             $scope.ui.activateTab('Scans');
                         }, 1000);
                     } else {
@@ -141,25 +106,10 @@
                 });
             },
         };
-
-        // Listen to changes to the selected zend app to update the value of the new application name
-        // (if it is empty)
-        $scope.$watch('scan.selectedZendApp', function(newValue, oldValue) {
-            if ($scope.scan.newAppName === '' && newValue != 0) {
-                // Search for the path
-                var zendApp = $scope.scan.zendApps.find(function (element) {
-                    return element.path === newValue;
-                });
-
-                if (zendApp) {
-                    $scope.scan.newAppName = zendApp.name;
-                }
-            }
-        });
-
+        
         $scope.$watch('scanFromDocRoot.selectedDocRoot', function(newValue, oldValue) {
             if (newValue == 0) return;
-
+            
             $scope.scanFromDocRoot.hasScanSpec = false;
             $scope.scanFromDocRoot.loadScanSpec();
         }, true);
@@ -171,13 +121,11 @@
             scanSpec: '',
             version: new Date().toISOString(),
             loading: false,
-            newAppName: '',
-            signedIn: true,
 
             // loading
             initialLoadFinished: false,
             loadingrefresh: false,
-
+            
             load: function() {
                 var errorMessage = 'Error loading applications';
                 $scope.scanFromDocRoot.loadingrefresh = true;
@@ -207,12 +155,12 @@
 
             hasScanSpec: false,
             loadScanSpec: function() {
-
+                
                 // collect the data
                 var data = {
                     'vhost_id': $scope.scanFromDocRoot.selectedDocRoot
                 };
-
+                
                 // default error message
                 var errorMessage = 'Error starting scan';
 
@@ -234,7 +182,7 @@
                     $scope.scanFromDocRoot.hasScanSpec = true;
                 });
             },
-
+            
             // saving
             isSaving: false,
             save: function() {
@@ -244,13 +192,7 @@
                     'scan_spec': $scope.scanFromDocRoot.scanSpec,
                     'vhost_id': $scope.scanFromDocRoot.selectedDocRoot,
                     'version': $scope.scanFromDocRoot.version,
-                    'new_app_name': $scope.scanFromDocRoot.newAppName,
                 };
-
-                if (data['rips_id'] === '0' && (!data['new_app_name'] || data['new_app_name'] === '')) {
-                    document.fireEvent('toastAlert', {message: 'Please enter an application name.'});
-                    return;
-                }
 
                 // default error message
                 var errorMessage = 'Error starting scan';
@@ -264,7 +206,7 @@
                     if (res && res.data && res.data.responseData  && res.data.responseData.success == '1') {
                         document.fireEvent('toastNotification', {message: 'Scan started'});
                         setTimeout(function() {
-                            $scope.scans.load(false);
+                            $scope.scanFromDocRoot.load();
                             $scope.ui.activateTab('Scans');
                         }, 1000);
                     } else {
@@ -281,25 +223,12 @@
                 });
             },
         };
-
-        $scope.$watch('settings.username', function(newValue, oldValue) {
-            if (oldValue == '') return;
-            $scope.settings.readyToTest = true;
-            $scope.settings.isTestSuccessful = false;
-        });
-        
-        $scope.$watch('settings.password', function(newValue, oldValue) {
-            if (oldValue == '') return;
-            $scope.settings.readyToTest = true;
-            $scope.settings.isTestSuccessful = false;
-        });
         
 		$scope.settings = {
 		    username: '',
 		    password: '',
 		    api_url: '',
 		    ui_url: '',
-		    readyToTest: false,
 
             // loading
             initialLoadFinished: false,
@@ -352,16 +281,6 @@
                 }).then(function(res) {
                     if (res && res.data && res.data.responseData  && res.data.responseData.success == '1') {
                         document.fireEvent('toastNotification', {message: 'Settings stored'});
-                        
-                        $scope.scan.signedIn = true;
-                        $scope.scans.signedIn = true;
-                        $scope.scanFromDocRoot.signedIn = true;
-                        
-                        $scope.settings.readyToTest = false;
-                        
-                        $scope.scan.load();
-                        $scope.scans.load();
-                        $scope.scanFromDocRoot.load();
                     } else {
                         document.fireEvent('toastAlert', {message: errorMessage});
                     }
@@ -414,30 +333,25 @@
 
 		$scope.scans = {
 		    scans: [],
-            ui_url: '',
-            moreScansAvailable: false,
-            signedIn: true,
+		    ui_url: '',
 
             // loading
             initialLoadFinished: false,
             loading: false,
-            load: function(append) {
+            load: function() {
                 var errorMessage = 'Error loading scans';
                 $scope.scans.loading = true;
-                var offset = append ? $scope.scans.scans.length : 0;
-                var limit = !append ? ($scope.scans.scans.length !== 0 ? $scope.scans.scans.length : 20) : 20;
 
                 WebAPI({
                     method: 'GET',
-                    url: '/ZendServer/Api/ripsScans?offset=' + offset + '&limit=' + limit,
+                    url: '/ZendServer/Api/ripsScans'
                 }).then(function(res) {
                     if (res && res.data && res.data.responseData && res.data.responseData.scans && res.data.responseData.ui_url) {
-                        var scans = res.data.responseData.scans || [];
-                        $scope.scans.moreScansAvailable = res.data.responseData.more;
+                        $scope.scans.scans = res.data.responseData.scans || [];
                         $scope.scans.ui_url = res.data.responseData.ui_url || '';
 
                         var reload = false;
-                        scans.forEach(function(scan) {
+                        $scope.scans.scans.forEach(function(scan) {
                             // Reload after a few seconds if there are still running scans
                             if (scan.percent < 100) {
                                 reload = true;
@@ -456,15 +370,9 @@
                             }
                         });
 
-                        if (append) {
-                            $scope.scans.scans = $scope.scans.scans.concat(scans);
-                        } else {
-                            $scope.scans.scans = scans;
-                        }
-
                         if (reload) {
                             setTimeout(function() {
-                                $scope.scans.load(false);
+                                $scope.scans.load();
                             }, 2000);
                         }
                     } else {
@@ -485,32 +393,26 @@
 
 		$scope.issues = {
 		    issues: [],
-            ui_url: '',
-            moreIssuesAvailable: false,
+		    ui_url: '',
 
             // loading
             initialLoadFinished: false,
             loading: false,
-            load: function(applicationId, scanId, append) {
+            load: function(applicationId, scanId) {
                 var errorMessage = 'Error loading issues';
                 $scope.issues.loading = true;
-                var offset = append ? $scope.issues.issues.length : 0;
-                var limit = !append ? ($scope.issues.issues.length !== 0 ? $scope.issues.issues.length : 200) : 200;
 
                 WebAPI({
                     method: 'GET',
-                    url: '/ZendServer/Api/ripsIssues?application_id=' + applicationId + '&scan_id=' + scanId + '&offset=' + offset + '&limit=' + limit,
+                    url: '/ZendServer/Api/ripsIssues?application_id='+applicationId+'&scan_id='+scanId
                 }).then(function(res) {
                     if (res && res.data && res.data.responseData && res.data.responseData.issues && res.data.responseData.ui_url) {
-                        var issues = res.data.responseData.issues || [];
+                        $scope.issues.issues = res.data.responseData.issues || [];
                         $scope.issues.ui_url = res.data.responseData.ui_url || '';
-                        $scope.issues.moreIssuesAvailable = issues.length % 200 === 0;
 
-                        if (append) {
-                            $scope.issues.issues = $scope.issues.issues.concat(issues);
-                        } else {
-                            $scope.issues.issues = issues;
-                        }
+                        $scope.issues.issues.sort(function(a, b) {
+                            return b.type.severity - a.type.severity;
+                        });
                     } else {
                         document.fireEvent('toastAlert', {message: errorMessage});
                     }
@@ -574,7 +476,7 @@
         $scope.scan.load();
         $scope.scanFromDocRoot.load();
         $scope.settings.load();
-        $scope.scans.load(false);
+        $scope.scans.load();
     }]);
 
 	// Helper functions
